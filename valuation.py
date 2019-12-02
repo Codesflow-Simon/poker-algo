@@ -10,7 +10,7 @@ card_order_dict = {"2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7,
                    "8": 8, "9": 9, "T": 10, "J": 11, "Q": 12, "K": 13, "A": 14}
 
 def get_ranks(hand):
-    return [card[1] for card in hand]
+    return [card[0] for card in hand]
 
 def get_rank_int(hand):
     ranks = get_ranks(hand)
@@ -20,10 +20,10 @@ def find_key(hand, value):
     return list(hand.keys())[list(hand.values()).index(value)]
 
 def comapre_hand_values(a, b):
-    for i, _ in enumerate(a):
+    for i in range(min(len(a), len(b))):
         if a[i] > b[i]:
             return 'a'
-        elif b[i] < a[i]:
+        elif a[i] < b[i]:
             return 'b'
     return 'split'
       
@@ -39,7 +39,7 @@ def check_seven_hand(seven_hand):
             highest_values = values
             continue
         elif result == 'b':
-            break
+            continue
 
     return highest_hand, highest_values,
 
@@ -71,7 +71,7 @@ def check_five_hand(hand):
         return values
     
     ranks = get_rank_int(hand)
-    return tuple(chain([1],reversed(sorted(ranks))))
+    return tuple(chain([0],reversed(sorted(ranks))))
 
 
 def check_straight_flush(hand):
@@ -83,7 +83,7 @@ def check_straight_flush(hand):
 
 
 def check_four_of_a_kind(hand):
-    values = [i[1] for i in hand]
+    values = [i[0] for i in hand]
     value_counts = defaultdict(lambda:0)
     for v in values:
         value_counts[v] += 1
@@ -95,7 +95,7 @@ def check_four_of_a_kind(hand):
 
 
 def check_full_house(hand):
-    values = [i[1] for i in hand]
+    values = [i[0] for i in hand]
     value_counts = defaultdict(lambda: 0)
     for v in values:
         value_counts[v] += 1
@@ -107,7 +107,7 @@ def check_full_house(hand):
 
 
 def check_flush(hand):
-    suits = [i[0] for i in hand]
+    suits = [i[1] for i in hand]
     ranks = get_rank_int(hand)
     if len(set(suits)) == 1:
         return tuple(chain([6],reversed(sorted(ranks))))
@@ -116,7 +116,7 @@ def check_flush(hand):
 
 
 def check_straight(hand):
-    values = [i[1] for i in hand]
+    values = [i[0] for i in hand]
     value_counts = defaultdict(lambda: 0)
     for v in values:
         value_counts[v] += 1
@@ -132,7 +132,7 @@ def check_straight(hand):
 
 
 def check_three_of_a_kind(hand):
-    values = [i[1] for i in hand]
+    values = [i[0] for i in hand]
     value_counts = defaultdict(lambda: 0)
     for v in values:
         value_counts[v] += 1
@@ -147,7 +147,7 @@ def check_three_of_a_kind(hand):
 
 
 def check_two_pairs(hand):
-    values = [i[1] for i in hand]
+    values = [i[0] for i in hand]
     value_counts = defaultdict(lambda: 0)
     for v in values:
         value_counts[v] += 1
@@ -164,7 +164,7 @@ def check_two_pairs(hand):
 
 
 def check_one_pair(hand):
-    values = [i[1] for i in hand]
+    values = [i[0] for i in hand]
     value_counts = defaultdict(lambda: 0)
     for v in values:
         value_counts[v] += 1
@@ -184,8 +184,3 @@ def check_one_pair(hand):
     else:
         return ()
 
-
-for _ in range(1):
-    # hand = random_hand(7)
-    hand = (('s', 'J'),('s', '2'),('d', 'A'),('d', '5'),('h', '3'), ('h', 'T'), ('h', '9'))
-    print(check_seven_hand(hand))

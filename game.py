@@ -1,6 +1,7 @@
 import itertools
 import random
 from numpy.random import choice
+from valuation import check_seven_hand, comapre_hand_values
 
 # player_count = int(input("How many players? "))
 player_count = 2
@@ -38,6 +39,7 @@ class Players:
         self.stack = stack
         self.last_action = "none"  # last action taken (check, call etc).
         self.reset()
+        self.holecards()
 
     def reset(self):
         self.cards = ()
@@ -47,10 +49,10 @@ class Players:
     def holecards(self):
         card1 = draw_next_card(drawn_cards)
         card2 = draw_next_card(drawn_cards)
-        self.cards = (self.card1, self.card2)
+        self.cards = (card1, card2)
 
     def action(self, table_info={}):
-        dist = [0.3, 0.2, 0.3, 0.15, 0.05]
+        dist = [0.0, 0.3, 0.3, 0.3, 0.1]
         a = [i+1 for i in list(range(0,5))]
         action = choice(a, p=dist)
         self.prev_actions.append(action)
@@ -74,6 +76,9 @@ class Players:
 
     def add_stack(self, amount):
         self.stack += amount
+    
+    def get_cards(self):
+        return self.cards
 
 
 class Table:
@@ -86,6 +91,7 @@ class Table:
         self.players = (Players(100), Players(100))
         self.total_pot = [0, 0]
         self.phase = 'None'
+        self.table_cards = []
 
     def bet(self, player_idx, amount):
         real_amount = self.players[player_idx].bet(amount)
@@ -93,7 +99,6 @@ class Table:
 
 
     def fold(self, player_idx, depth):
-        print(self.total_pot[0], self.total_pot[1])
         if self.total_pot[0] == self.total_pot[1]:
             return self.call(player_idx, depth)
         other_player_idx = -player_idx+1
@@ -123,7 +128,7 @@ class Table:
         other_stack = other_player.get_stack()
         to_call = self.total_pot[other_player_idx] - \
             self.total_pot[player_idx]
-        amount = max(min(self.blind * 3 - self.total_pot[player_idx], other_stack, stack), 0)
+        amount = max(min(sum(self.total_pot), other_stack, stack), 0)
 
         if to_call >= amount:
             return self.call(player_idx, depth)
@@ -160,7 +165,6 @@ class Table:
         other_player = self.players[other_player_idx]
         stack = player.get_stack()
         other_stack = other_player.get_stack()
-
         amount = min(stack, other_stack+self.total_pot[other_player_idx]-self.total_pot[player_idx])
         self.bet(player_idx, amount)
         return 4
@@ -190,45 +194,85 @@ class Table:
         print('the pot is {}'.format(self.total_pot), '\n')
         
         if all_in_state == 2:
-            print('betting round over')
-            return 2
+            return 3
         elif response in {0,1,2}:
-            print('betting round over')
             return response
-        self.betting_round(depth+1, all_in_state)
+        response = self.betting_round(depth+1, all_in_state)
+        return response
+
+
+    def game(self):
+        self.start()
+        streets = [self.preflop, self.flop, self.turn, self.river]
+        for street in streets:
+            response = street()
+            print('betting over with response {}'.format(response))
+            if response in {0,1}:
+                return
+            elif response == 2:
+                continue
+            elif response == 3:
+                break
+        self.showdown()
+
 
     def preflop(self):
-        self.street_pot = 0
         self.phase = 'preflop'
-        self.bet(0, self.blind//2)
         self.bet(1, self.blind)
+        print(self.phase)
         print('the pot is {}'.format(self.total_pot), '\n')
-        self.betting_round()
+        return self.betting_round()
 
     def flop(self):
+        self.phase = 'flop'
         (self.card1, self.card2, self.card3) = (draw_next_card(drawn_cards),
                                                 draw_next_card(drawn_cards),
                                                 draw_next_card(drawn_cards))
         self.flop = (self.card1, self.card2, self.card3)
-        # print(self.flop)
+        self.table_cards = list(self.flop)
+        print(self.phase)
+        print('the pot is {}'.format(self.total_pot), '\n')
+        return self.betting_round()
 
     def turn(self):
-        self.card = draw_next_card(drawn_cards)
-        self.turn = self.card
-        # print(self.turn)
+        self.phase = 'turn'
+        self.turn = draw_next_card(drawn_cards)
+        self.table_cards.append(self.turn)
+        print(self.phase)
+        print('the pot is {}'.format(self.total_pot), '\n')
+        return self.betting_round()
 
     def river(self):
-        self.card = draw_next_card(drawn_cards)
-        self.river = self.card
-        # print(self.river)
+        self.phase = 'river'
+        self.river = draw_next_card(drawn_cards)
+        self.table_cards.append(self.river)
+        print(self.table_cards)
+        print(self.phase)
+        print('the pot is {}'.format(self.total_pot), '\n')
+        return self.betting_round()
+
+    def showdown(self):
+        values = []
+        for player in self.players:
+            holecards = player.get_cards()
+            hand = list(itertools.chain(self.table_cards, holecards))
+            best_hand, value = check_seven_hand(hand)
+            values.append(value)
+            print(best_hand)
+        winner = comapre_hand_values(values[0], values[1])
+        print(values)
+        print(winner)
+        print('player {} wins'.format('1' if winner=='a' else '2'))
+        if winner == 'a':
+            self.players[0].add_stack(sum(self.total_pot))
+        elif winner == 'b':
+            self.players[1].add_stack(sum(self.total_pot))
+        print(self.players[0].get_stack(), self.players[1].get_stack())
+
+
 
 # Add dealer to table:
 
 
 dealer = Table(2)
-dealer.start()
-dealer.preflop()
-
-dealer.flop()
-dealer.turn()
-dealer.river()
+dealer.game()
