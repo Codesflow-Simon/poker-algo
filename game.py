@@ -1,7 +1,8 @@
 import itertools
 import random
 from valuation import check_seven_hand, comapre_hand_values
-from players import Random_bot, Human
+from players import RandomBot, Human, SmartBot
+from ai import save
 
 # player_count = int(input("How many players? "))
 player_count = 2
@@ -10,7 +11,6 @@ suits = ['s', 'c', 'd', 'h']
 faces = ['A', '2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K']
 
 # Defining deck and drawing cards (5 + 2 per player):
-
 
 def draw_next_card(drawn_cards):
     card = drawn_cards.pop(len(drawn_cards)-1)
@@ -21,10 +21,6 @@ def readable_card_name(short_card_name):
     return (short_card_name[0]+"["+short_card_name[1]+"]")
 
 # Storing a list with player object instances
-
-
-action_dict = {0: 'error', 1: 'folds', 2: 'calls',
-               3: '3-bets', 4: 'raises the pot', 5: 'goes all in'}
 
 
 class Table:
@@ -40,29 +36,24 @@ class Table:
     def get_stacks(self):
         return [player.get_stack() for player in self.players]
 
-    def start(self, players):
-        self.phase = 'preflop'
+    def game(self, players):
+        self.phase = 'None'
+
         self.players = players
         self.hole_cards = [self.holecards(), self.holecards()]
-        self.total_pot = [0, 0]
-        self.phase = 'None'
-        self.table_cards = []
+        self.community_cards = []
 
-    def game(self, player_stacks=100):
-        self.start(player_stacks)
+        self.total_pot = [0, 0]
         prev_stacks = self.get_stacks()
+
         streets = [self.preflop, self.flop, self.turn, self.river]
-        print(self.get_stacks())
         for street in streets:
-            [player.show_cards(self.hole_cards[i], self.table_cards)
-                for i, player in enumerate(self.players)]
             response = street()
-            print('betting over with response {}'.format(response))
+
             if response in {'none', 'fold'}:
                 stacks = self.get_stacks()
                 delta = [stacks[i]-prev_stacks[i]
                          for i, _ in enumerate(stacks)]
-                print(stacks, delta)
                 return stacks, delta
             elif response == 'call':
                 continue
@@ -71,15 +62,16 @@ class Table:
         self.showdown()
         stacks = self.get_stacks()
         delta = [stacks[i]-prev_stacks[i] for i, _ in enumerate(stacks)]
-        print(stacks, delta)
+        [player.game_callback({'reward_sum': delta[i]}) for i, player in enumerate(self.players)]
         return stacks, delta
 
     def betting_round(self, depth=0):
         player_idx = depth % 2
         response = 'none'
         player = self.players[player_idx]
-        action = player.action()
-        print('player {} {}'.format(player_idx+1, action))
+
+        info = {'holes': self.hole_cards[player_idx], 'community': self.community_cards}
+        action = player.action(info)
         other_player_idx = -player_idx+1
         if action == 'fold':
             response = self.fold(player_idx, depth)
@@ -91,10 +83,10 @@ class Table:
             response = self.pot_raise(player_idx, depth)
         elif action == 'all in':
             response = self.all_in(player_idx)
-
-        print('has response {}'.format(response))
-        print('the pot is {}'.format(self.total_pot), '\n')
-
+        
+        info = {'holes': self.hole_cards[player_idx], 'community': self.community_cards, 'action': action}
+        player.betting_callback(info)
+        
         if response in {'none', 'fold', 'call'}:
             return response
         response = self.betting_round(depth+1)
@@ -122,7 +114,7 @@ class Table:
             self.bet(player_idx, amount)
             return 'call' if depth != 0 else 'raise'
         else:
-            self.fold(player_idx)
+            self.fold(player_idx, depth)
             return 'fold'
 
     def three_bet(self, player_idx, depth):
@@ -180,8 +172,6 @@ class Table:
     def preflop(self):
         self.phase = 'preflop'
         self.bet(1, self.blind)
-        print('\n', self.phase)
-        print('the pot is {}'.format(self.total_pot), '\n')
         return self.betting_round()
 
     def flop(self):
@@ -190,54 +180,45 @@ class Table:
                                                 draw_next_card(drawn_cards),
                                                 draw_next_card(drawn_cards))
         self.flop_cards = (self.card1, self.card2, self.card3)
-        self.table_cards = list(self.flop_cards)
-        print(self.phase)
-        print('the pot is {}'.format(self.total_pot), '\n')
+        self.community_cards = list(self.flop_cards)
         return self.betting_round()
 
     def turn(self):
         self.phase = 'turn'
         self.turn_cards = draw_next_card(drawn_cards)
-        self.table_cards.append(self.turn_cards)
-        print(self.phase)
-        print('the pot is {}'.format(self.total_pot), '\n')
+        self.community_cards.append(self.turn_cards)
         return self.betting_round()
 
     def river(self):
         self.phase = 'river'
         self.river_cards = draw_next_card(drawn_cards)
-        self.table_cards.append(self.river_cards)
-        print(self.phase)
-        print('the pot is {}'.format(self.total_pot), '\n')
+        self.community_cards.append(self.river_cards)
         return self.betting_round()
 
     def showdown(self):
         values = []
         for player_idx, _ in enumerate(self.players):
             hand = list(itertools.chain(
-                self.table_cards, self.hole_cards[player_idx]))
-            print(hand)
+                self.community_cards, self.hole_cards[player_idx]))
             best_hand, value = check_seven_hand(hand)
             values.append(value)
-            print(best_hand)
         winner = comapre_hand_values(values[0], values[1])
-        print(values)
-        print(winner)
-        print('player {} wins'.format('1' if winner == 'a' else '2'))
         if winner == 'a':
             self.players[0].add_stack(sum(self.total_pot))
         elif winner == 'b':
             self.players[1].add_stack(sum(self.total_pot))
 
-
 # Add dealer to table:
 
 dealer = Table(2)
 stacks = [random.randint(50, 500), random.randint(50, 500)]
-for _ in range(10):
+for _ in range(1000):
     deck = set(itertools.product(faces, suits))
     drawn_cards = random.sample(deck, (5 + 2 * player_count))
-    stacks, deltas = dealer.game((Random_bot(stacks[0]),
-                          Random_bot(stacks[1])))
-    if 0 in stacks:
-        break
+    stacks, deltas = dealer.game((RandomBot(stacks[0]),
+                                  SmartBot(stacks[1])))
+save()
+deck = set(itertools.product(faces, suits))
+drawn_cards = random.sample(deck, (5 + 2 * player_count))
+stacks, deltas = dealer.game((Human(stacks[0]),
+                                SmartBot(stacks[1])))
