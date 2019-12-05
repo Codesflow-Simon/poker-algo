@@ -76,7 +76,7 @@ class SmartBot(Player):
         self.state_action_que = []
 
     def action(self, info={}):
-        epsilon = 0.01
+        epsilon = 0.1
         greedy = choice([0,1], p=[epsilon, 1-epsilon])
         if greedy:
             cards = tuple(chain(info['holes'], info['community']))

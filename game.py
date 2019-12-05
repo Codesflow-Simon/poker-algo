@@ -12,6 +12,7 @@ faces = ['A', '2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K']
 
 # Defining deck and drawing cards (5 + 2 per player):
 
+
 def draw_next_card(drawn_cards):
     card = drawn_cards.pop(len(drawn_cards)-1)
     return card
@@ -45,34 +46,41 @@ class Table:
 
         self.total_pot = [0, 0]
         prev_stacks = self.get_stacks()
+        # print(prev_stacks)
 
+        completed = 0
         streets = [self.preflop, self.flop, self.turn, self.river]
         for street in streets:
             response = street()
-
+            # print('betting over')
             if response in {'none', 'fold'}:
-                stacks = self.get_stacks()
-                delta = [stacks[i]-prev_stacks[i]
-                         for i, _ in enumerate(stacks)]
-                return stacks, delta
+                completed = 1
+                break
             elif response == 'call':
                 continue
             elif response == 'all in':
                 break
-        self.showdown()
+        if not(completed):
+            self.showdown()
         stacks = self.get_stacks()
         delta = [stacks[i]-prev_stacks[i] for i, _ in enumerate(stacks)]
-        [player.game_callback({'reward_sum': delta[i]}) for i, player in enumerate(self.players)]
+        [player.game_callback({'reward_sum': delta[i]})
+         for i, player in enumerate(self.players)]
         return stacks, delta
 
-    def betting_round(self, depth=0):
+    def betting_round(self, depth=0, all_in_state=0):
         player_idx = depth % 2
         response = 'none'
         player = self.players[player_idx]
 
-        info = {'holes': self.hole_cards[player_idx], 'community': self.community_cards}
+        info = {'holes': self.hole_cards[player_idx],
+                'community': self.community_cards}
         action = player.action(info)
         other_player_idx = -player_idx+1
+
+        if all_in_state == 1:
+            all_in_state = 2
+
         if action == 'fold':
             response = self.fold(player_idx, depth)
         elif action == 'call':
@@ -82,14 +90,21 @@ class Table:
         elif action == 'pot raise':
             response = self.pot_raise(player_idx, depth)
         elif action == 'all in':
+            if all_in_state == 0:
+                all_in_state = 1
             response = self.all_in(player_idx)
-        
-        info = {'holes': self.hole_cards[player_idx], 'community': self.community_cards, 'action': action}
+        # print('player {} does {}'.format(player_idx+1, action))
+        # print('has response {}'.format(response))
+
+        info = {'holes': self.hole_cards[player_idx],
+                'community': self.community_cards, 'action': action}
         player.betting_callback(info)
-        
-        if response in {'none', 'fold', 'call'}:
+
+        if all_in_state == 2:
+            return 'all in'
+        elif response in {'none', 'fold', 'call'}:
             return response
-        response = self.betting_round(depth+1)
+        response = self.betting_round(depth+1, all_in_state)
         return response
 
     def bet(self, player_idx, amount):
@@ -210,15 +225,17 @@ class Table:
 
 # Add dealer to table:
 
+
 dealer = Table(2)
-stacks = [random.randint(50, 500), random.randint(50, 500)]
-for _ in range(1000):
+for i in range(1000):
+    # print(i)
+    stacks = [random.randint(50, 500), random.randint(50, 500)]
     deck = set(itertools.product(faces, suits))
     drawn_cards = random.sample(deck, (5 + 2 * player_count))
-    stacks, deltas = dealer.game((RandomBot(stacks[0]),
+    stacks, deltas = dealer.game((SmartBot(stacks[0]),
                                   SmartBot(stacks[1])))
 save()
 deck = set(itertools.product(faces, suits))
 drawn_cards = random.sample(deck, (5 + 2 * player_count))
 stacks, deltas = dealer.game((Human(stacks[0]),
-                                SmartBot(stacks[1])))
+                              SmartBot(stacks[1])))
