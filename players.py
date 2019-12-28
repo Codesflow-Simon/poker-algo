@@ -1,11 +1,14 @@
-from numpy.random import choice
-from random import randint
-from ai import q_values, memorise, intergerify_cards, train
+import asyncio
 from itertools import chain
+from random import randint
+
 import numpy as np
+from numpy.random import choice
+
+from ai import Agent
 
 action_dict = {'fold': 0, 'call': 1,
-               'three-bet': 2, 'pot raise': 3, 'all in': 4}
+               'three-bet': 2, 'pot raise': 3}
 reverse_action_dict = {value: key for key, value in action_dict.items()}
 
 
@@ -13,21 +16,18 @@ class Player:
     def __init__(self, stack):
         self.stack = stack
         self.last_action = "none"  # last action taken (check, call etc).
-        self.reset()
-
-    def reset(self):
-        self.prev_actions = []
-        self.in_pot = 0
 
     def bet(self, amount):
         if amount <= self.stack:
-            self.in_pot += amount
             self.stack -= amount
             return amount
         elif amount > self.stack:
-            self.in_pot += self.stack
             self.stack = 0
             return self.stack
+        
+    def set_stack(self, value):
+        assert type(value) in {int, float}
+        self.stack = value
 
     def get_stack(self):
         return self.stack
@@ -43,58 +43,59 @@ class Player:
 
     def game_callback(self, info):
         pass
-
+    
+    def save(self):
+        pass
 
 class RandomBot(Player):
-    def __init__(self, stack, dist=[0.1, 0.5, 0.2, 0.1, 0.1]):
-        super(RandomBot, self).__init__(stack)
+    def __init__(self, stack=0, dist=[0.1, 0.5, 0.2, 0.2]):
+        super().__init__(stack)
         self.dist = dist
 
-    def action(self, table_info={}):
-        a = ['fold', 'call', 'three-bet', 'pot raise', 'all in']
+    def action(self, info):
+        a = ['fold', 'call', 'three-bet', 'pot raise']
         action = choice(a, p=self.dist)
-        self.prev_actions.append(action)
+        return action
+
+class Human(Player):      
+    def __init__(self, stack=0):
+        super().__init__(stack)
+
+    def action(self, info):
+        a = ['fold', 'call', 'three-bet', 'pot raise']
+        action = a[int(input('What action? '))]
         return action
 
 
-class Human(Player):
-    def action(self, info={}):
-        a = ['fold', 'call', 'three-bet', 'pot raise', 'all in']
-        p = input('action: ')
-        action = a[int(p)]
-        self.prev_actions.append(action)
-        return action
-
-    def betting_callback(self, info={}):
-        print('Your hole cards: {}, table cards: {}'.format(
-            info['holes'], info['community']))
-
-
+agent = Agent('resnet20', True)
 class SmartBot(Player):
-    def __init__(self, stack):
+    def __init__(self, stack=0, model=None):
         super().__init__(stack)
         self.state_action_que = []
+        if model:
+            self.agent = Agent(model, True)
+        else:
+            self.agent = agent
 
-    def action(self, info={}):
+    def action(self, info):
         epsilon = 0.1
         greedy = choice([0,1], p=[epsilon, 1-epsilon])
         if greedy:
-            cards = tuple(chain(info['holes'], info['community']))
-            state = intergerify_cards(cards)
-            state = state.reshape(1,-1)
-            action_qs = q_values(state)
-            action = np.argmax(action_qs)
+            action =  self.agent.action(info)
         else:
-            action = randint(0,4)
+            action = randint(0,3)
         return reverse_action_dict[action]
 
-    def betting_callback(self, info={}):
-        state = intergerify_cards(chain(info['holes'], info['community']))
+    def betting_callback(self, info):
+        state =  self.agent.create_state(info)
         action = action_dict[info['action']]
         self.state_action_que.append((state, action))
 
     def game_callback(self, info):
-        reward = info['reward_sum']
+        reward = info['reward']
         for state, action in self.state_action_que:
-            memorise(state, action, reward)
-        train()
+             self.agent.memorise(state, action, reward)
+        self.agent.train()
+        
+    def save(self):
+        self.agent.save()

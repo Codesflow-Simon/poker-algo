@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Poker Bot</title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="banner">
+        <h1 class="title">Poker bot</h1>
+    </div>
+    <div class="container">
+        <div class="cardInput">
+            <div class="buttonContainer">
+                <script src="buttons.js"></script>
+            </div>
+        </div>
+        <div class="numberContainer">
+            <h4 class="inputCaption">Your stack</h4>
+            <input class="numberInput playerStack" type="number" min="0" max"500">
+            <h4 class="inputCaption">Opponents stack</4h>
+            <input class="numberInput opponentStack" type="number" min="0" max"500">
+            <h4 class="inputCaption">Opponents current bet</h4>
+            <input class="numberInput currentBet" type="number" min="0" max"500">
+            <h4 class="inputCaption">Pot</h4>
+            <input class="numberInput pot" type="number" min="0" max"500">
+            <p style="font-size: 10px">All values measured in terms of blinds</p>
+            
+            <div class="bettingInterface">
+                <h4> Make bet</h4>
+                <div style="text-align: center">
+                    <p class="bettingItem">Your bet?<input class="isPlayer" type="checkbox" style="position: absolute; width: 15px%; height: 15px; margin-left: 5px;"></p>
+                    <p class="bettingItem">Amount <br><input class="betAmount" type="number" min="0" max"500" value="0" style="width: 100%"></p>
+                </div>
+                <script>
+                    playerStack = $('.playerStack');
+                    opponentStack = $('.opponentStack');
+                    currentBet = $('.currentBet');
+                    pot = $('.pot');            
+                    
+                    master = $('.bettingInterface');
+                    betButton = $('<button>')
+                    betButton.addClass('bettingItem');
+                    betButton.text('Bet');
+                    betButton.click(()=>{
+                        amount = Number($('.betAmount').val());
+                        isPlayer =  Number($('.isPlayer').prop('checked'));
+                        
+                        pot.val(Number(pot.val())+amount)
+                        if (isPlayer) {
+                            playerStack.val(Math.max(playerStack.val()-amount,0))
+                            currentBet.val(Math.max(Number(currentBet.val())-amount, 0))
+                        } else {
+                            opponentStack.val(Math.max(opponentStack.val()-amount),0)
+                            currentBet.val(Math.min(Number(currentBet.val())+amount),500)
+                        }
+                    })
+                    master.append(betButton)
+                </script>
+            </div>
+            <div class="saveReset">
+                <script>
+                    saved = [100, 99, 1, 1];
+                    master = $('.saveReset');
+                    betReset = $('<button>');
+                    betReset.addClass('betReset');
+                    betReset.text('Reset');
+                    betReset.click(()=>{
+                        playerStack.val(saved[0])
+                        opponentStack.val(saved[1])
+                        currentBet.val(saved[2])
+                        pot.val(saved[3])
+                    })
+                    betReset.trigger('click')
+                    betSave = $('<button>');
+                    betSave.addClass('betReset');
+                    betSave.text('Save');
+                    betSave.click(()=>{
+                        saved[0] = playerStack.val()
+                        saved[1] = opponentStack.val()
+                        saved[2] = currentBet.val()
+                        saved[3] = pot.val() 
+                    })
+                    master.append(betReset, betSave)
+                </script>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,72 @@
+* {
+    font-family: Arial, Helvetica, sans-serif;
+    margin: 0;
+    
+}
+
+.banner{
+    text-align: center;
+    background-color: gainsboro;
+    padding: 2%;
+ 
+    position: -webkit-sticky; /* Safari */
+    position: sticky;
+    top: 0;
+}
+
+.cardInput {
+    float: left;
+}
+
+.suitColumn{
+    float:left;
+    width: 25%;
+}
+
+.card {
+    border: 1px solid grey;
+    display: block;
+    color: white;
+    font-size: 20px;
+    margin:0;
+    height: 40px;
+    width: 100%;
+    cursor: pointer;
+}
+
+.reset {
+    display: inline;
+    text-align: center;
+    width: 80%;
+    height: 62px;
+    margin: 10px 10%;
+    cursor: pointer;
+}
+
+.numberContainer {
+    margin: 10% 5%;
+    float: left;
+    width: 20%;
+}
+
+.numberInput {
+    width: 100%;
+    margin: 2.5% 0 5% 0;
+}
+
+.bettingInterface {
+    margin-top: 20%;
+    padding: 10%;
+    border: 1px solid black;
+}
+
+.bettingItem {
+    font-size: 13px;
+    text-align: left;
+    margin-top: 5%;
+}
+
+.betReset {
+    width: 40%;
+    margin: 5% 5%;
+}

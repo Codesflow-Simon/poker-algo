@@ -1,10 +1,5 @@
-from testing import random_hand
 from collections import defaultdict
 from itertools import combinations, chain
-
-
-hand = random_hand
-
 
 card_order_dict = {"2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7,
                    "8": 8, "9": 9, "T": 10, "J": 11, "Q": 12, "K": 13, "A": 14}
@@ -19,7 +14,7 @@ def get_rank_int(hand):
 def find_key(hand, value):
     return list(hand.keys())[list(hand.values()).index(value)]
 
-def comapre_hand_values(a, b):
+def compare_hand_values(a, b):
     for i in range(min(len(a), len(b))):
         if a[i] > b[i]:
             return 'a'
@@ -33,7 +28,7 @@ def check_seven_hand(seven_hand):
     highest_values = (0,0,0,0,0,0)
     for hand in hands:
         values = check_five_hand(hand)
-        result = comapre_hand_values(values, highest_values)
+        result = compare_hand_values(values, highest_values)
         if result == 'a':
             highest_hand = hand
             highest_values = values

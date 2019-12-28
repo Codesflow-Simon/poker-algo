@@ -1,3 +1,4 @@
+import os
 from collections import deque
 from itertools import chain
 from random import sample
@@ -5,84 +6,145 @@ from random import sample
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from sklearn.decomposition import PCA
+import wandb
 from tensorflow import keras
 from tensorflow.keras import Model
-from tensorflow.keras.layers import Dense
-
-memory_length = 5000
-pca = PCA(n_compnents=5)
-
-class QModel(Model):
-    def __init__(self):
-        super(QModel, self).__init__()
-        self.dense_one = Dense(100)
-        self.dense_two = Dense(50)
-        self.dense_three = Dense(20)
-        self.dense_four = Dense(5)
-
-    def call(self, x):
-        x = self.dense_one(x)
-        x = self.dense_two(x)
-        x = self.dense_three(x)
-        x = self.dense_four(x)
-        return x
-
-
-q_values = QModel()
-
-optimizer = keras.optimizers.Adam()
-loss_object = keras.losses.MeanSquaredError()
-train_loss = keras.metrics.MeanSquaredError()
-
-memory = deque([], memory_length)
-
+from tensorflow.keras.layers import (Activation, BatchNormalization, Dense,
+                                     Input, add)
 
 def intergerify_cards(cards):
-    suit_dict = {'s': 0, 'c': 1, 'h': 2, 'd': 3}
-    rank_dict = {'2': 0, '3': 1, '4': 2, '5': 3, '6': 4, '7': 5,
-                 '8': 6, '9': 7, 'T': 8, 'J': 9, 'Q': 10, 'K': 11, 'A': 12}
-    state = np.zeros((14), dtype=np.float32)-1
+    suit_dict = {'s': 1, 'c': 2, 'h': 3, 'd': 4}
+    rank_dict = {'2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6,
+                    '8': 7, '9': 8, 'T': 9, 'J': 10, 'Q': 11, 'K': 12, 'A': 13}
+    state = np.zeros((14), dtype=np.float32)
     for i, card in enumerate(cards):
         state[2*i] = rank_dict[card[0]]
         state[2*i+1] = suit_dict[card[1]]
-    return state
+    return list(state)
 
+class Agent():
+    def __init__(self, model_name, training, gpu=True):
+        self.MODEL_NAME = model_name
+        self.FILE_NAME = model_name + '.h5'
+        if not gpu:
+            os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+        if training:
+            MEMORY_LENGTH = 5000
+            wandb.init('poker')
+            self.optimizer = keras.optimizers.Adam(0.0000001)
+            self.loss_object = keras.losses.MeanSquaredError()
 
-def memorise(state, action, reward_sum):
-    memory.append({'state': state, 'action': action, 'reward_sum': reward_sum})
+            self.index = np.zeros((1,))
+            self.action_ratios = np.zeros((4,))
 
+            self.memory = deque([], MEMORY_LENGTH)
 
-def train(epoch=1, batch_size=3):
-    if len(memory) < batch_size:
-        return
-    data = sample(memory, batch_size)
-    data = pd.DataFrame(data)
-    state = np.stack(data['state'])
-	# compressed_state = tf.constant(pca.fit_transform(state))
-    print(q_values(np.array([12, 3, 12, 1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1]).reshape((1, -1))))
-    action = tf.constant(data['action'])
-    one_hot_actions = tf.one_hot(action, 5)
-    reward = tf.constant(np.array(data['reward_sum']))
-    train_step(state, one_hot_actions, reward)
+            self.train_step = tf.function(
+                self._train_step, experimental_relax_shapes=True)
 
+        self.model = self.get_model(self.FILE_NAME)
+        self.model.summary()
+        
 
-def _train_step(state, one_hot_actions, reward_sum):
-    with tf.GradientTape() as tape:
-        state_predictions = q_values(state)
-        action_q = tf.reduce_sum(state_predictions * one_hot_actions, axis=1)
-        loss = loss_object(reward_sum, action_q)
-    gradients = tape.gradient(loss, q_values.trainable_variables)
-    optimizer.apply_gradients(zip(gradients, q_values.trainable_variables))
+    def get_model(self, file):
+        if os.path.isfile(file):
+            print('loading')
+            model = keras.models.load_model(file, compile=True)
+            model.build((-1, 19))
+        else:
+            print('creating new nn')
+            def residual_block(input_tensor):
 
+                x = BatchNormalization()(input_tensor)
+                x = Activation('elu')(x)
+                x = Dense(100, use_bias=False)(x)
 
-    # train_loss(loss, action_q)
-train_step = tf.function(_train_step, experimental_relax_shapes=True)
+                x = BatchNormalization()(x)
+                x = Activation('elu')(x)
+                x = Dense(100, use_bias=False)(x)
 
+                x = add([x, input_tensor])
+                x = Activation('elu')(x)
+                return x
 
-def save():
-    q_values.save_weights('test.h5')
+            def QModel(input_shape):
+                input_ = Input(shape=input_shape)
+                x = Dense(1000, use_bias=False)(input_)
+                x = BatchNormalization()(x)
+                x = Activation('elu')(x)
+                x = Dense(100, use_bias=False)(input_)
+                x = BatchNormalization()(x)
+                x = Activation('elu')(x)
+                for _ in range(20):
+                    x = residual_block(x)
+                x = Dense(4)(x)
+                model = Model(input_, x, name='dense_'+self.MODEL_NAME)
+                return model
+            model = QModel((19,))
+            model.build((-1, 19))
+            model.save(file)
+        return model
 
+    def action(self, info):
+        # print(self.model.predict(self.prev), '\n')
+        state = self.create_state(info)
+        state = state.reshape(1, -1)
+        # self.prev = state
+        action_qs = self.model.predict(state)
+        # print(action_qs)
+        action = np.argmax(action_qs)
+        return action
 
-def load():
-    q_values.load_weights('test.h5')
+    def create_state(self, info):
+        cards = chain(info['player_holes'], info['community'])
+        state = intergerify_cards(cards)
+        state.append(info['player_stack']/info['blind'])
+        state.append(info['opponents_stack']/info['blind'])
+        state.append(info['player_pot']+info['opponents_pot']/info['blind'])
+        state.append(info['opponents_pot']- info['player_pot']/info['blind'])
+        state.append(info['player_number'])
+        return np.array(state)
+
+    def memorise(self, state, action, reward):
+        self.memory.append(
+            {'state': state, 'action': action, 'reward': reward})
+
+    def train(self, epoch=1, batch_size=128):
+        if len(self.memory) < batch_size:
+            return
+        data = sample(self.memory, batch_size)
+        data = pd.DataFrame(data)
+        state = np.stack(data['state'])
+        action = tf.constant(data['action'])
+        one_hot_actions = tf.one_hot(action, 4)
+        reward = tf.constant(np.array(data['reward']))
+        
+        
+        
+        loss = self.train_step(state, one_hot_actions, reward)
+        assert np.isfinite(loss)
+
+        for action in data['action']:
+            self.action_ratios[action] += 1
+            self.index[0] += 1
+
+        wandb.log({'reward': np.array(data['reward']), 'action': np.array(data['action']), 'loss': loss.numpy(), 'fold': self.action_ratios[0]/self.index[0],
+                   'call': self.action_ratios[1]/self.index[0],  'three bet': self.action_ratios[2]/self.index[0],  'raise': self.action_ratios[3]/self.index[0]})
+
+    def _train_step(self, state, one_hot_actions, reward):
+        with tf.GradientTape() as tape:
+            state_predictions = self.model(state)
+            action_q = tf.reduce_sum(
+                state_predictions * one_hot_actions, axis=1)
+            loss = self.loss_object(reward, action_q)
+        gradients = tape.gradient(loss, self.model.trainable_variables)
+        self.optimizer.apply_gradients(
+            zip(gradients, self.model.trainable_variables))
+        return loss
+
+    def save(self):
+        print(f'saving to: {self.FILE_NAME}')
+        self.model.save(self.MODEL_NAME)
+        
+    def predict(self, state):
+        return self.model.predict(state)
