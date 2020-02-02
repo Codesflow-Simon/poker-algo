@@ -8,36 +8,59 @@ from numpy.random import choice
 from ai import Agent
 
 action_dict = {'fold': 0, 'call': 1,
-               'three-bet': 2, 'pot raise': 3}
+               'qtr_pot': 2, 'half_pot': 3, 'full_pot': 4, 'two_pot': 5}
 reverse_action_dict = {value: key for key, value in action_dict.items()}
 
-
 class Player:
-    def __init__(self, stack):
-        self.stack = stack
-        self.last_action = "none"  # last action taken (check, call etc).
+    def __init__(self):
+        self.stack = 0
+        self.pot = 0
+        self.status = ''
+        self.cards = ()
+        
 
     def bet(self, amount):
-        if amount <= self.stack:
-            self.stack -= amount
-            return amount
-        elif amount > self.stack:
-            self.stack = 0
-            return self.stack
+        assert type(amount) in {int, np.int32}
+        assert self.stack >= amount
+        self.stack -= amount
+        self.pot += amount
+        return amount
+    
+    def set_cards(self, cards):
+        assert type(cards) in {list, tuple}
+        self.cards = tuple(cards)
+        
+    def get_cards(self):
+        return self.cards
         
     def set_stack(self, value):
-        assert type(value) in {int, float}
+        assert type(value) in {int, np.int32}
         self.stack = value
 
     def get_stack(self):
         return self.stack
 
-    def get_in_pot(self):
-        return self.in_pot
+    def add_stack(self, x):
+        assert type(x) in {int, np.int32}
+        self.stack += x
+        return self.stack
+        
+    def set_pot(self, x):
+        assert type(x) in {int, np.int32}
+        self.pot = x
+        return self.pot
 
-    def add_stack(self, amount):
-        self.stack += amount
-
+    def get_pot(self):
+        return self.pot
+    
+    def set_status(self, x):
+        assert x in {'', 'out', 'active', 'all_in'}
+        self.status = x
+        return self.status
+        
+    def get_status(self):
+        return self.status
+    
     def betting_callback(self, info):
         pass
 
@@ -53,7 +76,7 @@ class RandomBot(Player):
         self.dist = dist
 
     def action(self, info):
-        a = ['fold', 'call', 'three-bet', 'pot raise']
+        a = list(action_dict.keys())
         action = choice(a, p=self.dist)
         return action
 
@@ -62,20 +85,14 @@ class Human(Player):
         super().__init__(stack)
 
     def action(self, info):
-        a = ['fold', 'call', 'three-bet', 'pot raise']
-        action = a[int(input('What action? '))]
+        action = reverse_action_dict[int(input('What action? '))]
         return action
 
-
-agent = Agent('resnet20', True)
 class SmartBot(Player):
-    def __init__(self, stack=0, model=None):
-        super().__init__(stack)
+    def __init__(self, agent, stack=0):
+        super().__init__()
         self.state_action_que = []
-        if model:
-            self.agent = Agent(model, True)
-        else:
-            self.agent = agent
+        self.agent = agent
 
     def action(self, info):
         epsilon = 0.1
@@ -83,7 +100,7 @@ class SmartBot(Player):
         if greedy:
             action =  self.agent.action(info)
         else:
-            action = randint(0,3)
+            action = randint(0,5)
         return reverse_action_dict[action]
 
     def betting_callback(self, info):
@@ -96,6 +113,9 @@ class SmartBot(Player):
         for state, action in self.state_action_que:
              self.agent.memorise(state, action, reward)
         self.agent.train()
+        
+    def transfer_weights(self):
+        self.agent.transfer_weights()
         
     def save(self):
         self.agent.save()

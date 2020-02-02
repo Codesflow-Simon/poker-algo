@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+<!--    <meta http-equiv="X-UA-Compatible" content="IE=edge">-->
     <title>Poker Bot</title>
     <meta name="description" content="">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -21,29 +21,23 @@
                 <script src="buttons.js"></script>
             </div>
         </div>
-        <div class="numberContainer">
+        <div class="staticVariables">
             <h4 class="inputCaption">Your stack</h4>
             <input class="numberInput playerStack" type="number" min="0" max"500">
-            <h4 class="inputCaption">Opponents stack</4h>
-            <input class="numberInput opponentStack" type="number" min="0" max"500">
-            <h4 class="inputCaption">Opponents current bet</h4>
-            <input class="numberInput currentBet" type="number" min="0" max"500">
-            <h4 class="inputCaption">Pot</h4>
-            <input class="numberInput pot" type="number" min="0" max"500">
-            <p style="font-size: 10px">All values measured in terms of blinds</p>
-            
+            <h4 class="inputCaption">Your pot contribition</h4>
+            <input class="numberInput playerPot" type="number" min="0" max"500">
+            <h4 class="bettingItem">Player number <br><input class="playerNumber" type="number" min="1" max"6" value="1" style="width: 100%"></h4>
+
             <div class="bettingInterface">
                 <h4> Make bet</h4>
                 <div style="text-align: center">
-                    <p class="bettingItem">Your bet?<input class="isPlayer" type="checkbox" style="position: absolute; width: 15px%; height: 15px; margin-left: 5px;"></p>
                     <p class="bettingItem">Amount <br><input class="betAmount" type="number" min="0" max"500" value="0" style="width: 100%"></p>
                 </div>
                 <script>
                     playerStack = $('.playerStack');
-                    opponentStack = $('.opponentStack');
-                    currentBet = $('.currentBet');
-                    pot = $('.pot');            
-                    
+                    playerPot = $('.playerPot');
+                    playerNumber = $('.playerNumber')
+
                     master = $('.bettingInterface');
                     betButton = $('<button>')
                     betButton.addClass('bettingItem');
@@ -51,45 +45,170 @@
                     betButton.click(()=>{
                         amount = Number($('.betAmount').val());
                         isPlayer =  Number($('.isPlayer').prop('checked'));
+
+                        playerPot.val(Number(playerPot.val())+amount)
                         
-                        pot.val(Number(pot.val())+amount)
-                        if (isPlayer) {
-                            playerStack.val(Math.max(playerStack.val()-amount,0))
-                            currentBet.val(Math.max(Number(currentBet.val())-amount, 0))
-                        } else {
-                            opponentStack.val(Math.max(opponentStack.val()-amount),0)
-                            currentBet.val(Math.min(Number(currentBet.val())+amount),500)
-                        }
+                        playerStack.val(Math.max(playerStack.val()-amount,0))
+                        currentBet.val(Math.max(Number(currentBet.val())-amount, 0))
                     })
                     master.append(betButton)
                 </script>
             </div>
-            <div class="saveReset">
-                <script>
-                    saved = [100, 99, 1, 1];
-                    master = $('.saveReset');
-                    betReset = $('<button>');
-                    betReset.addClass('betReset');
-                    betReset.text('Reset');
-                    betReset.click(()=>{
-                        playerStack.val(saved[0])
-                        opponentStack.val(saved[1])
-                        currentBet.val(saved[2])
-                        pot.val(saved[3])
+            <p style="font-size: 10px">All values measured in terms of blinds</p>
+        </div>
+        <div class="dynamicVariables">
+            <script>
+                const urlParams = new URLSearchParams(window.location.search);
+                let playerCount = urlParams.get('players');
+                if (playerCount === null){playerCount=6}
+                opponentCount = playerCount -1
+                master = $('.dynamicVariables')
+                stacks = $('<div class="stackColumn">')
+                opponentStacks = []
+                for(let i=0; i<opponentCount; i++){
+                    wrapper = $('<div>')
+                    caption = $('<h4>')
+                    caption.addClass('inputCaption')
+                    caption.text("Opponent "+(i+1)+"'s stack")
+                    wrapper.append(caption)
+                    input = $('<input>')
+                    input.attr('type', 'number')
+                    input.attr('min', '0')
+                    input.attr('max', '500')
+                    input.addClass('numberInput opponentStack')
+                    opponentStacks.push(input)
+                    wrapper.append(input)
+                    stacks.append(wrapper)
+                }
+                pots = $('<div class="potColumn">')
+                opponentPots = []
+                for(let i=0; i<opponentCount; i++){
+                    wrapper = $('<div>')
+                    caption = $('<h4>')
+                    caption.addClass('inputCaption')
+                    caption.text("Opponent "+(i+1)+"'s pot")
+                    wrapper.append(caption)
+                    input = $('<input>')
+                    input.attr('type', 'number')
+                    input.attr('min', '0')
+                    input.attr('max', '500')
+                    input.addClass('numberInput opponentPot')
+                    opponentPots.push(input)
+                    wrapper.append(input)
+                    pots.append(wrapper)
+                }
+                master.append(stacks, pots)
+            </script>
+        </div>
+        <div class="qValues">
+            <script>
+                master = $('.qValues')
+                qValueElements = []
+                labels = ['fold', 'call', 'quater', 'half', 'full', 'double']
+                labels.forEach((labelText)=>{
+                    wrapper = $('<div>')
+                    wrapper.addClass('qValueWrapper')
+                    label = $('<h4>')
+                    label.addClass('qValueLabel')
+                    label.text(labelText)
+                    wrapper.append(label)
+                    value = $('<output>')
+                    value.addClass('qValueOutput')
+                    value.text('0')
+                    wrapper.append(value)
+                    master.append(wrapper)
+                    qValueElements.push(value)
+                })
+                initUrl =  'http://127.0.0.1:5000/initiate/'+playerCount
+                $.ajax({
+                    url:initUrl,
+                    type: 'GET',
+                })
+                
+                calc_button = $('<button>')
+                calc_button.addClass('calcButton')
+                calc_button.text('Calcuate')
+                calc_button.click(()=>{
+                    reSuitDict = {'s':0, 'c':1, 'h':2, 'd':3, 0:0}
+                    reRankDict = {'2':0, '3':1, '4':2, '5':3, '6':4, '7':5, '8':6, '9':7, 'T':8, 'J':9, 'Q':10, 'K':11, 'A':12, 0:0}
+                    
+                    console.log(riverCards.getCards())
+                    holes = holeCards.getCards()
+                    flops = flopCards.getCards().length !== 0 ? flopCards.getCards() : [[0,0],[0,0],[0,0]]
+                    turn = turnCards.getCards().length !== 0 ? turnCards.getCards() : [[0,0]]
+                    river = riverCards.getCards().length !== 0 ? riverCards.getCards() : [[0,0]]
+                    console.log(river)
+                    data = [
+                        reRankDict[holes[0][0]],
+                        reSuitDict[holes[0][1]],
+                        reRankDict[holes[1][0]],
+                        reSuitDict[holes[1][1]],
+                        reRankDict[flops[0][0]],
+                        reSuitDict[flops[0][1]],
+                        reRankDict[flops[1][0]],
+                        reSuitDict[flops[1][1]],
+                        reRankDict[flops[2][0]],
+                        reSuitDict[flops[2][1]],
+                        reRankDict[turn[0][0]],
+                        reSuitDict[turn[0][1]],
+                        reRankDict[river[0][0]],
+                        reSuitDict[river[0][1]],
+                    ]
+                    start = (playerNumber.val()-1)%6
+                    
+                    data.push(Number(playerStack.val()))
+                    for (let i=start; i<(start+5)%6; i=(i+1)%6){
+                        data.push(Number(opponentStacks[i].val()))
+                    }
+                    
+                    data.push(Number(playerPot.val()))
+                    for (let i=start; i<(start+5)%6; i=(i+1)%6){
+                        data.push(Number(opponentPots[i].val()))
+                    }
+                    data.push(Number(playerNumber.val())-1)
+                    
+                    console.log(data)
+                    $.ajax({
+                        url: `http://127.0.0.1:5000/predict?data=[${data}]`,
+                        type: 'GET',
+                        success: (result)=>{
+                            qValues = result.data[0]
+                            for(let i=0; i<qValues.length; i++){
+                                value = Math.round(qValues[i]*1000)/1000
+                                qValueElements[i].text(value)
+                            }
+                        }
                     })
-                    betReset.trigger('click')
-                    betSave = $('<button>');
-                    betSave.addClass('betReset');
-                    betSave.text('Save');
-                    betSave.click(()=>{
-                        saved[0] = playerStack.val()
-                        saved[1] = opponentStack.val()
-                        saved[2] = currentBet.val()
-                        saved[3] = pot.val() 
-                    })
-                    master.append(betReset, betSave)
-                </script>
-            </div>
+                })
+                master.append(calc_button)                        
+            </script>
+        </div>
+
+        <div class="saveReset">
+            <script>
+                saved = [100, 0, 100, 0];
+                master = $('.saveReset');
+                betReset = $('<button>');
+                betReset.addClass('betReset');
+                betReset.text('Reset');
+                betReset.click(()=>{
+                    playerStack.val(saved[0])
+                    playerPot.val(saved[1])
+                    opponentStacks.forEach((stack)=>stack.val(saved[2]))
+                    opponentPots.forEach((pot)=>pot.val(saved[3]))
+                })
+                betReset.trigger('click')
+                betSave = $('<button>');
+                betSave.addClass('betReset');
+                betSave.text('Save');
+                betSave.click(()=>{
+                    saved[0] = playerStack.val()
+                    saved[1] = opponentStack.val()
+                    saved[2] = currentBet.val()
+                    saved[3] = pot.val() 
+                })
+                master.append(betReset, betSave)
+            </script>
         </div>
     </div>
 </body>

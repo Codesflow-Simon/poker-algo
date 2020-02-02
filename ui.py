@@ -126,7 +126,10 @@ dealer_frame.pack(side='top')
 
 input_screen.pack(side='left')
 
-agent = Agent('resnet20', False, False)
+try:
+    agent = Agent('./models/main', False, n_players=6, gpu=False)
+except KeyError:
+    raise KeyError('Model not found')
 
 def compute():
     state = intergerify_cards(chain(hole_cards, community_cards))
@@ -139,10 +142,12 @@ def compute():
     predictions = agent.predict(state.reshape(1, -1))[0]
     fold.set(predictions[0])
     call.set(predictions[1])
-    three_bet.set(predictions[2])
-    raise_.set(predictions[3])
+    qtr_raise.set(predictions[2])
+    half_raise.set(predictions[3])
+    full_raise.set(predictions[4])
+    two_raise.set(predictions[5])
     action = np.argmax(predictions)
-    action_dict = {0: 'fold', 1:'call', 2:'three_bet', 3:'raise'}
+    action_dict = {0: 'fold', 1:'call', 2:'qtr_pot', 3:'half_pot', 4:'full_pot', 5:'two_pot'}
     recommended.set(action_dict[action])
     root.after(32, compute)
     
@@ -162,17 +167,29 @@ Label(call_frame, text='call: ').pack(side='left')
 Label(call_frame, textvariable=call).pack(side='left')
 call_frame.pack(side='top')
 
-three_bet = DoubleVar()
-three_bet_frame = Frame(results)
-Label(three_bet_frame, text='three bet: ').pack(side='left')
-Label(three_bet_frame, textvariable=three_bet).pack(side='left')
-three_bet_frame.pack(side='top')
+qtr_raise = DoubleVar()
+qtr_frame = Frame(results)
+Label(qtr_frame, text='quater raise: ').pack(side='left')
+Label(qtr_frame, textvariable= qtr_raise).pack(side='left')
+qtr_frame.pack(side='top')
 
-raise_ = DoubleVar()
-raise_frame = Frame(results)
-Label(fold_frame, text='raise: ').pack(side='left')
-Label(fold_frame, textvariable= raise_).pack(side='left')
-raise_frame.pack(side='top')
+half_raise = DoubleVar()
+half_frame = Frame(results)
+Label(half_frame, text='half raise: ').pack(side='left')
+Label(half_frame, textvariable= half_raise).pack(side='left')
+half_frame.pack(side='top')
+
+full_raise = DoubleVar()
+full_frame = Frame(results)
+Label(full_frame, text='full raise: ').pack(side='left')
+Label(full_frame, textvariable= full_raise).pack(side='left')
+full_frame.pack(side='top')
+
+two_raise = DoubleVar()
+two_frame = Frame(results)
+Label(two_frame, text='double raise: ').pack(side='left')
+Label(two_frame, textvariable= two_raise).pack(side='left')
+two_frame.pack(side='top')
 
 recommended = StringVar()
 raise_frame = Frame(results)
