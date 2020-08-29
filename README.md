@@ -10,3 +10,5 @@ To run the ui you must first run the internal server with:
 Then run the `index.html` file in your browser.
 You can do this by openning file explorer and naviating to the webpage folder in this directory
 Then open the html by double clicking it, it should open in your default brower.
+
+A convergent, intellegent model was never found in this project. If you manage to create a working model please contact me.
